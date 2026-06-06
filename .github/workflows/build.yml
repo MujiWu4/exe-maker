@@ -1,0 +1,32 @@
+name: Mac發動Windows自動打包機
+
+on:
+  workflow_dispatch: # 讓你可以手動按按鈕發動火箭
+
+jobs:
+  build-windows:
+    runs-on: windows-latest # 借用微軟最新的雲端 Windows 電腦！
+
+    steps:
+    - name: 1. 複製程式碼到雲端電腦
+      uses: actions/checkout@v4
+
+    - name: 2. 幫雲端電腦安裝 Python 環境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: 3. 安裝我們程式需要的鋼鐵外殼 (套件)
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas openpyxl pyinstaller
+
+    - name: 4. 開始施展 PyInstaller 打包魔法
+      run: |
+        pyinstaller --noconsole --onefile matcher.py
+
+    - name: 5. 把做好的 .exe 檔案上傳到網頁讓你下載
+      uses: actions/upload-artifact@v4
+      with:
+        name: 對帳小幫手_Windows版_EXE
+        path: dist/matcher.exe
