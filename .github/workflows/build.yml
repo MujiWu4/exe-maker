@@ -1,31 +1,47 @@
-name: Mac發動Windows自動打包機
+name: Mac發動Windows自動打包機_最新修正版
 
 on:
   workflow_dispatch: # 讓你可以手動按按鈕發動火箭
 
 jobs:
   build-windows:
-    runs-on: windows-latest # 借用微軟最新的雲端 Windows 電腦！
+    # 1. 修正點：指名使用最穩定的 Windows 2022 伺服器，避開 2026 環境衝突
+    runs-on: windows-2022 
+
+    # 2. 修正點：加入環境變數，強制允許相容性設定
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
 
     steps:
+    # 3. 修正點：升級拉取程式碼機器人到 v4 穩定版
     - name: 1. 複製程式碼到雲端電腦
       uses: actions/checkout@v4
 
+    # 4. 修正點：升級 Python 環境設定機器人到 v5 穩定版
     - name: 2. 幫雲端電腦安裝 Python 環境
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    - name: 3. 安裝我們程式需要的鋼鐵外殼 (套件)
+    # 5. 修正點：在 Windows 環境中，強制指定編碼為 UTF-8，避免樂器品名亂碼導致打包失敗
+    - name: 3. 設定雲端電腦編碼
+      run: |
+        chcp 65001
+        echo "PYTHONIOENCODING=utf-8" >> $GITHUB_ENV
+      shell: bash
+
+    - name: 4. 安裝我們程式需要的鋼鐵外殼 (套件)
       run: |
         python -m pip install --upgrade pip
         pip install pandas openpyxl pyinstaller
+      shell: bash
 
-    - name: 4. 開始施展 PyInstaller 打包魔法
+    - name: 5. 開始施展 PyInstaller 打麻魔法
       run: |
         pyinstaller --noconsole --onefile matcher.py
+      shell: bash
 
-    - name: 5. 把做好的 .exe 檔案上傳到網頁讓你下載
+    - name: 6. 把做好的 .exe 檔案上傳到網頁讓你下載
       uses: actions/upload-artifact@v4
       with:
         name: 對帳小幫手_Windows版_EXE
