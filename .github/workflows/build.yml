@@ -36,7 +36,7 @@ jobs:
     # 🔥 修正點：老師把 matcher.py 換成你專屬的「進貨清單處理程式.py」囉！
     - name: 5. 開始施展 PyInstaller 打包魔法
       run: |
-        pyinstaller --clean --windowed --onefile "進貨清單處理程式.py"
+        pyinstaller --clean --windowed --onefile "進貨清單處理程式V2.py"
       shell: pwsh
 
     # 🔥 修正點：打包出來的產物名字會跟著你的 Python 檔名走，所以路徑也要同步修改
