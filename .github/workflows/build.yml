@@ -1,14 +1,15 @@
-name: Mac發動Windows自動打包機_終極修正版
+name: Mac發動Windows自動打包機_檔名精準對齊版
 
 on:
   workflow_dispatch: # 讓你可以手動按按鈕發動火箭
 
 jobs:
   build-windows:
-    runs-on: windows-2022 # 使用最穩定的 Windows 2022 環境
+    runs-on: windows-2022 # 使用最穩定的 Windows 2022 伺服器
 
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true' # 允許 Node 20 相容
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
     steps:
     - name: 1. 複製程式碼到雲端電腦
@@ -19,29 +20,28 @@ jobs:
       with:
         python-version: '3.11'
 
-    # 修正點：改用 Windows 聽得懂的 pwsh (PowerShell) 來設定國際中文編碼 UTF-8
-    - name: 3. 設定雲端電腦編碼
+    - name: 3. 設定雲端電腦國際中文編碼
       run: |
         [Console]::InputEncoding = [System.Text.Encoding]::UTF8
         [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
         echo "PYTHONIOENCODING=utf-8" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       shell: pwsh
 
-    # 修正點：全面改用 pwsh 執行安裝
     - name: 4. 安裝我們程式需要的鋼鐵外殼 (套件)
       run: |
         python -m pip install --upgrade pip
         pip install pandas openpyxl pyinstaller
       shell: pwsh
 
-    # 修正點：全面改用 pwsh 執行打包
+    # 🔥 修正點：老師把 matcher.py 換成你專屬的「進貨清單處理程式.py」囉！
     - name: 5. 開始施展 PyInstaller 打包魔法
       run: |
-        pyinstaller --noconsole --onefile matcher.py
+        pyinstaller --clean --windowed --onefile "進貨清單處理程式.py"
       shell: pwsh
 
+    # 🔥 修正點：打包出來的產物名字會跟著你的 Python 檔名走，所以路徑也要同步修改
     - name: 6. 把做好的 .exe 檔案上傳到網頁讓你下載
       uses: actions/upload-artifact@v4
       with:
         name: 對帳小幫手_Windows版_EXE
-        path: dist/matcher.exe
+        path: dist/進貨清單處理程式.exe
