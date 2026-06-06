@@ -5,10 +5,10 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-latest # 叫出一台微軟最新版的雲端虛擬電腦
+    # 提前換上 GitHub 2026 年 6 月規定的最新版虛擬機，完美預防系統過期警告！
+    runs-on: windows-2025-vs2026
 
     env:
-      # 配合 2026 官方最新規範，強迫使用高效能的 Node.js 24 環境，防止警告打架
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
     steps:
@@ -19,25 +19,23 @@ jobs:
       # 2. 幫雲端機器安裝 Python 環境
       - name: 2. 初始化 Python 環境
         uses: actions/setup-python@v5
-        with:
-          python-version: "3.11" # 使用最穩定且支援 PyInstaller 的 Python 版本
-          cache: "pip"
+        # 🚨【核心魔法修正】移除 cache: "pip" 設定！
+        # 這樣機器就不會傻傻去檢查 requirements.txt 檔案，徹底解決卡住的問題！
 
-      # 3. 安裝樂器行對帳小幫手需要的四大護法套件
+      # 3. 手動安裝樂器行對帳小幫手需要的套件
       - name: 3. 安裝相依套件與打包工具
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller openpyxl pandas
 
-      # 4. 🔥【核心魔法】將 V2 程式碼封包成 EXE
-      # --onefile 表示打包成單一獨立檔案，--noconsole 表示執行時不會彈出黑黑的命令提示字元視窗
+      # 4. 將 V2 程式碼封包成 EXE
       - name: 4. 使用 PyInstaller 執行封包
         run: |
           pyinstaller --onefile --noconsole "進貨清單處理程式V2.py"
 
-      # 5. 🚀【收網大成功】把打包好的完美 V2 .exe 成品上傳到網頁供你下載
+      # 5. 把打包好的完美 V2 .exe 成品上傳到網頁供你下載
       - name: 5. 傳送 EXE 成品至網頁展示架
         uses: actions/upload-artifact@v4
         with:
-          name: 進貨清單處理程式V2_Windows執行檔 # 這會是你下載下來的壓縮包名字
-          path: dist/進貨清單處理程式V2.exe # 這裡路徑精準對齊，絕對不會再走丟！
+          name: 進貨清單處理程式V2_Windows執行檔
+          path: dist/進貨清單處理程式V2.exe
