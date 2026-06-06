@@ -44,4 +44,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: 對帳小幫手_Windows版_EXE
-        path: dist/進貨清單處理程式.exe
+        path: dist/進貨清單處理程式V2.exe
