@@ -49,29 +49,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install openpyxl pyinstaller
 
-      - name: 5. 啟動 Python 原生智慧切名並進行封包
-        shell: python
+      - name: 5. 啟動智慧原生環境變數進行「同名 EXE」封包
+        shell: bash
         run: |
-          import os
-          import subprocess
+          FULL_FILENAME="${{ github.event.inputs.file_name }}"
           
-          # 1. 精準讀取網頁輸入的完整檔名
-          full_filename = "${{ github.event.inputs.file_name }}"
+          # 【終極核心修復】使用 Bash 記憶體內建切除語法，完美避開檔案寫入權限與 Windows 斜線盲點
+          # 此方法會精準咬住結尾的 .py 並抹除，不論中文（如：關鍵字新增）或英文，通通一秒切出純檔名
+          EXE_NAME="${FULL_FILENAME%.*}"
           
-          # 2. 使用 Python 標準庫秒切副檔名，100% 避免 Windows 變數空白盲點
-          exe_name = os.path.splitext(full_filename)[0]
+          # 安全將變數傳遞給下一個步驟
+          echo "EXE_NAME_RAW=${EXE_NAME}" >> $GITHUB_ENV
           
-          # 3. 將純檔名寫入 GitHub 雲端環境變數中，供後續步驟讀取
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f"EXE_NAME_RAW={exe_name}\n")
-              
-          print(f"🚀 正在將 [ {full_filename} ] 打包成同名執行檔 [ {exe_name}.exe ]...")
-          
-          # 4. 執行打包命令
-          cmd = f"pyinstaller --onefile --noconsole --name \"{exe_name}\" \"{full_filename}\""
-          subprocess.run(cmd, shell=True, check=True)
+          echo "🚀 正在將 [ $FULL_FILENAME ] 打包成同名執行檔 [ ${EXE_NAME}.exe ]..."
+          pyinstaller --onefile --noconsole --name "$EXE_NAME" "$FULL_FILENAME"
 
-      # 修正點：有了上面 100% 穩定的純檔名變數，此處的 Artifacts 區塊將能完美還原您第一張截圖的直接下載畫面！
+      # 成果一：將在您的 Actions 任務 Summary 網頁最底部，完美呈現一鍵點擊直接下載的 Artifacts 區塊！
       - name: 6. 將同名 EXE 檔案直接提交至 Artifacts 下載區
         uses: actions/upload-artifact@v4.6.0
         with:
@@ -79,6 +72,7 @@ jobs:
           path: dist/*.exe
           retention-days: 90
 
+      # 成果二：將在您的 Releases 獨立頁面中，強行覆蓋殘留物，生成專屬於您指定名稱的同名 EXE 下載點！
       - name: 7. 呼叫 GitHub 官方 CLI 進行智慧創建與強行覆蓋發佈
         shell: bash
         run: |
