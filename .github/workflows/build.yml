@@ -17,13 +17,18 @@ on:
 permissions:
   contents: write # 賦予雲端電腦寫入 Release 的權限
 
+env:
+  # 2026 最新最高防護：提前強制所有雲端套件以穩定的 Node 24 引擎運行，消除警告並加速打包
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-and-release:
     runs-on: windows-latest
 
     steps:
+      # 升級至支援 Node 24 核心之最新 checkout 變體
       - name: 1. 複製 GitHub 原始碼到雲端
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: 2. 驗證檔案是否存在（防呆檢查）
         shell: bash
@@ -34,8 +39,9 @@ jobs:
             exit 1
           fi
 
+      # 升級至支援 Node 24 核心之最新 python 環境變體
       - name: 3. 初始化雲端 Python 環境
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.4.0
         with:
           python-version: '3.11'
 
@@ -49,8 +55,9 @@ jobs:
           # 動態讀取網頁輸入的檔名進行封包
           pyinstaller --onefile --noconsole "${{ github.event.inputs.file_name }}"
 
+      # 升級至支援 Node 24 核心之最新 release 投放變體
       - name: 6. 自動創建 GitHub Release 並發佈軟體
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.1.0
         with:
           tag_name: ${{ github.event.inputs.version_tag }}
           name: "發佈版本 ${{ github.event.inputs.version_tag }}"
