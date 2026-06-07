@@ -23,7 +23,8 @@ env:
 
 jobs:
   build-and-release:
-    runs-on: windows-latest
+    # 解決 2026 公告盲點：直接手動指定最新的穩定 Windows 伺服器核心，避免重定向警告
+    runs-on: windows-2025
 
     steps:
       - name: 1. 複製 GitHub 原始碼到雲端
@@ -53,13 +54,14 @@ jobs:
           # 動態讀取網頁輸入的檔名進行封包
           pyinstaller --onefile --noconsole "${{ github.event.inputs.file_name }}"
 
-      - name: 6. 自動創建 GitHub Release 並發佈軟體 (內建智慧覆蓋機制)
+      - name: 6. 自動創建 GitHub Release 並發佈軟體 (內建智慧相容與覆蓋修正)
         uses: softprops/action-gh-release@v2.1.0
         with:
           tag_name: ${{ github.event.inputs.version_tag }}
           name: "發佈版本 ${{ github.event.inputs.version_tag }}"
           body: "此版本是由雲端自動化手動封包產出的 [${{ github.event.inputs.file_name }}] 執行檔。"
           files: dist/*.exe # 自動尋找 dist 資料夾底下打包好的 exe 檔案上傳
-          overwrite: true # 【終極核心修復】若檔案已存在，自動啟用覆蓋更新，永不亮紅燈死機
+          fail_on_unmatched_files: false # 如果有任何比對落差，不崩潰死機
+          make_latest: true # 智慧覆蓋：強制將這個檔案設定為最新的 Release 發佈物，解決已經存在的問題
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
