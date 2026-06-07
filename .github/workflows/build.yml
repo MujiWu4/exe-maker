@@ -1,45 +1,46 @@
-name: 選擇檔案並自動打包 EXE 流程
+name: 自動打包為 Windows 獨立軟體
 
-# 設定為手動觸發，並提供視窗讓使用者輸入要打包的檔案
+# 設定為手動觸發，並提供下拉選單與輸入框讓您選擇要封包的檔案
 on:
   workflow_dispatch:
     inputs:
       target_file:
-        description: '請輸入想要封包的 Python 檔名（需包含 .py 擴充檔名）'
+        description: '請輸入或選擇您要封包的 Python 原始檔案名稱'
         required: true
-        default: 'main.py'  # 預設檔名
+        default: '關鍵字新增.py'  # 預設直接對準您的主程式
 
 jobs:
-  build_windows_exe:
-    runs-on: windows-latest
+  build_windows_app:
+    runs-on: windows-latest  # 使用微軟 Windows 雲端環境進行封包
 
     steps:
-    # 步驟 1：複製程式碼到雲端伺服器
-    - name: 複製程式碼
+    # 步驟 1：複製您 GitHub 倉庫內的所有程式碼
+    - name: 複製倉庫程式碼
       uses: actions/checkout@v4
 
-    # 步驟 2：設定 Python 環境
-    - name: 設定 Python 環境
+    # 步驟 2：部署 Python 執行環境
+    - name: 安裝 Python 環境
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
-    # 步驟 3：安裝打包工具 PyInstaller
-    - name: 安裝 PyInstaller 打包工具
+    # 步驟 3：安裝專案必備的第三方套件與打包工具
+    # 根據您的程式碼，必須安裝 openpyxl 才能處理 Excel 檔案
+    - name: 安裝 PyInstaller 與 openpyxl 套件
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
+        pip install pyinstaller openpyxl
 
-    # 步驟 4：動態取得檔名並執行 PyInstaller 打包
-    # ${{ github.event.inputs.target_file }} 會自動帶入您在網頁上輸入的檔名
-    - name: 使用 PyInstaller 打包指定檔案
+    # 步驟 4：執行 PyInstaller 編譯指令
+    # --onefile: 包裝成單一獨立的 .exe 執行檔
+    # --noconsole: 隱藏背後黑色的命令提示字元（CMD）視窗，讓它完全像一個正規的 Windows 視窗軟體
+    - name: 使用 PyInstaller 進行封包
       run: |
         pyinstaller --onefile --noconsole "${{ github.event.inputs.target_file }}"
 
-    # 步驟 5：動態上傳封包好的成果
-    # 使用 PowerShell 自動偵測 dist 資料夾底下的 .exe 檔案並上傳，確保檔名一致
-    - name: 上傳成果物
+    # 步驟 5：動態打包並輸出與原檔名完全一致的檔案
+    - name: 上傳打包好的 Windows 軟體
       uses: actions/upload-artifact@v4
       with:
-        name: Packaged_Windows_EXE
-        path: dist/*.exe
+        name: Windows_Software_Package
+        path: dist/*.exe  # 自動抓取產出的同名 .exe 檔案
