@@ -15,15 +15,14 @@ on:
         type: string
 
 permissions:
-  contents: write # 賦予雲端電腦寫入 Release 的權限
+  contents: write # 賦予雲端電腦絕對的 Release 寫入與發佈權限
 
 env:
-  # 強制所有雲端套件以穩定的 Node 24 引擎運行，確保 2026 年環境完美執行
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 綁定官方權限金鑰
 
 jobs:
   build-and-release:
-    # 解決 2026 公告盲點：直接手動指定最新的穩定 Windows 伺服器核心，避免重定向警告
     runs-on: windows-2025
 
     steps:
@@ -49,19 +48,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install openpyxl pyinstaller
 
-      - name: 5. 啟動 PyInstaller 封包您選取的檔案
+      - name: 5. 啟動 PyInstaller 進行「同名 EXE」智慧封包
+        shell: bash
         run: |
-          # 動態讀取網頁輸入的檔名進行封包
-          pyinstaller --onefile --noconsole "${{ github.event.inputs.file_name }}"
+          FULL_FILENAME="${{ github.event.inputs.file_name }}"
+          # 利用 bash 語法自動切除 .py 後綴，只留下純品名 (例如: seo_universal_final_v2)
+          EXE_NAME=$(basename "$FULL_FILENAME" .py)
+          
+          echo "正在將 [ $FULL_FILENAME ] 打包成同名執行檔 [ ${EXE_NAME}.exe ]..."
+          # 使用 --name 參數強制指定輸出的 exe 檔名
+          pyinstaller --onefile --noconsole --name "$EXE_NAME" "$FULL_FILENAME"
 
-      - name: 6. 自動創建 GitHub Release 並發佈軟體 (內建智慧相容與覆蓋修正)
-        uses: softprops/action-gh-release@v2.1.0
-        with:
-          tag_name: ${{ github.event.inputs.version_tag }}
-          name: "發佈版本 ${{ github.event.inputs.version_tag }}"
-          body: "此版本是由雲端自動化手動封包產出的 [${{ github.event.inputs.file_name }}] 執行檔。"
-          files: dist/*.exe # 自動尋找 dist 資料夾底下打包好的 exe 檔案上傳
-          fail_on_unmatched_files: false # 如果有任何比對落差，不崩潰死機
-          make_latest: true # 智慧覆蓋：強制將這個檔案設定為最新的 Release 發佈物，解決已經存在的問題
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 6. 呼叫 GitHub 官方 CLI 進行智慧創建與強行覆蓋發佈
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.version_tag }}"
+          FILE="${{ github.event.inputs.file_name }}"
+          
+          echo "正在檢查雲端是否已存在版本號 ${TAG}..."
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "正在建立全新 Release 版本 ${TAG}..."
+            gh release create "$TAG" --title "發佈版本 $TAG" --notes "此版本是由雲端自動化手動封包產出的 [ $FILE ] 執行檔。"
+          fi
+          
+          echo "正在啟動強行覆蓋機制上傳同名 EXE 檔案..."
+          # 採用官方 --clobber 暴力覆蓋，同名檔案重複丟入也絕對全綠燈通關
+          gh release upload "$TAG" dist/*.exe --clobber
