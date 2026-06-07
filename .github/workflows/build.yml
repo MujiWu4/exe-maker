@@ -1,171 +1,45 @@
-name: 雲端自選檔案打包工具 (EXE)
+name: 選擇檔案並自動打包 EXE 流程
 
+# 設定為手動觸發，並提供視窗讓使用者輸入要打包的檔案
 on:
-  workflow_dispatch: # 啟用 GitHub 網頁手動觸發功能
+  workflow_dispatch:
     inputs:
-      file_name:
-        description: '請輸入您要封包的 Python 原始碼檔名（需包含 .py 後綴）'
+      target_file:
+        description: '請輸入想要封包的 Python 檔名（需包含 .py 擴充檔名）'
         required: true
-        default: 'seo_universal_final_v2.py' # 預設顯示的主要檔案名稱
-        type: string
-      version_tag:
-        description: '請設定本次發佈的版本號（例如: v1.0.0）'
-        required: true
-        default: 'v1.0.0'
-        type: string
-
-permissions:
-  contents: write # 賦予雲端電腦絕對的 Release 寫入與發佈權限
-
-env:
-  # 強制所有雲端套件以穩定的 Node 24 引擎運行，確保 2026 年環境完美執行
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 綁定官方權限金鑰
+        default: 'main.py'  # 預設檔名
 
 jobs:
-  build-and-release:
-    # 鎖定 2026 專用 Windows 雲端伺服器，解決跨平台封包編碼衝突
-    runs-on: windows-2025
+  build_windows_exe:
+    runs-on: windows-latest
 
     steps:
-      - name: 1. 複製 GitHub 原始碼到雲端
-        uses: actions/checkout@v4.2.2
+    # 步驟 1：複製程式碼到雲端伺服器
+    - name: 複製程式碼
+      uses: actions/checkout@v4
 
-      - name: 2. 驗證檔案是否存在（防呆檢查）
-        shell: bash
-        run: |
-          if [ ! -f "${{ github.event.inputs.file_name }}" ]; then
-            echo "❌ 錯誤：在您的 GitHub 倉庫中找不到名為 [${{ github.event.inputs.file_name }}] 的檔案！"
-            echo "請確認檔案名稱大小寫是否正確、或是否已成功 Push 上傳。"
-            exit 1
-          fi
+    # 步驟 2：設定 Python 環境
+    - name: 設定 Python 環境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
-      - name: 3. 初始化雲端 Python 一致性環境
-        uses: actions/setup-python@v5.4.0
-        with:
-          python-version: '3.11'
+    # 步驟 3：安裝打包工具 PyInstaller
+    - name: 安裝 PyInstaller 打包工具
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
 
-      - name: 4. 安裝必要套件與封包工具
-        run: |
-          python -m pip install --upgrade pip
-          pip install openpyxl pyinstaller
+    # 步驟 4：動態取得檔名並執行 PyInstaller 打包
+    # ${{ github.event.inputs.target_file }} 會自動帶入您在網頁上輸入的檔名
+    - name: 使用 PyInstaller 打包指定檔案
+      run: |
+        pyinstaller --onefile --noconsole "${{ github.event.inputs.target_file }}"
 
-      - name: 5. 啟動智慧原生環境變數進行「同名 EXE」封包 (融合 Windows 物理死角修復版)
-        shell: bash
-        run: |
-          FULL_FILENAME="${{ github.event.inputs.file_name }}"
-          EXE_NAME="${FULL_FILENAME%.*}"
-          echo "EXE_NAME_RAW=${EXE_NAME}" >> $GITHUB_ENV
-          
-          echo "正在注入全商品通用精準死角攔截與 Windows 專用換行編碼防護..."
-          
-          cat << 'EOF' > patch_seo.py
-          import re
-          
-          def clean_and_generate_seo(product_name):
-              if not product_name: return ""
-              upper_name = str(product_name).upper()
-              
-              # A. 智慧電商重疊與擴充包防護
-              pack_match = re.search(r"PACK\s*([0-9]+)", upper_name)
-              if pack_match:
-                  pack_num = pack_match.group(1)
-                  if "7/5" in upper_name or "7&5" in upper_name:
-                      return f"# EXPANDINGPACK{pack_num} / EFNOTE75 / EFNOTE57"
-                  return f"# EXPANDINGPACK{pack_num}"
-                  
-              if "7/5" in upper_name or "7&5" in upper_name:
-                  return "# EFNOTE75 / EFNOTE57"
-          
-              # B. 清理中文與電商無效長雜訊
-              clean_text = upper_name
-              noises = ["SPECIAL EDITION", "HYBRID", "PRO", "MAX", "MINI", "AMP", "MODULE", "SERIES", "KIT", "ULTIMATE", "CRIMSON", "STRATA", "COMMAND", "TURBO", "STREAM", "【福利品】", "【二手】", "【OUTLET】", "數位", "電子", "套組", "套裝", "音箱", "喇叭", "配件", "專用", "保固", "加贈"]
-              for n in noises:
-                  clean_text = clean_text.replace(n, " ")
-              clean_text = re.sub(r"[\u4e00-\u9fa5]", " ", clean_text)
-              clean_text = re.sub(r"[【】（）()\[\]／,.\s]+", " ", clean_text).strip()
-              
-              if not clean_text: return ""
-              
-              # C. 全商品型號核心物理鎖定
-              core_model = ""
-              model_match = re.search(r"((?:TD|VAD|DTX|CS\s*D|DM|AK|SP|EFD)[-/ ]*[0-9]+[A-Z]*)", clean_text)
-              if model_match:
-                  core_model = model_match.group(1).replace(" ", "")
-              else:
-                  gen_match = re.search(r"([A-Z]+[-/ ]*[0-9]+)", clean_text)
-                  if gen_match:
-                      core_model = gen_match.group(1).replace(" ", "")
-                  else:
-                      words = clean_text.split()
-                      core_model = words if words else ""
-                      
-              if not core_model: return ""
-              
-              # D. 雙向變數推演
-              variants = []
-              if "-" in core_model or "/" in core_model:
-                  sticky = re.sub(r"[-/]", "", core_model)
-                  space = re.sub(r"[-/]", " ", core_model)
-                  if sticky: variants.append(sticky)
-                  if space and space != sticky: variants.append(space)
-              else:
-                  split = re.match(r"([A-Z]+)([0-9]+.*)", core_model)
-                  if split:
-                      variants.append(f"{split.group(1)}-{split.group(2)}")
-                      variants.append(f"{split.group(1)} {split.group(2)}")
-                  else:
-                      variants.append(core_model)
-                      
-              # E. 智慧過濾重複與死角安全閥保底
-              final_variants = []
-              for v in variants:
-                  if v in upper_name and len(variants) > 1: continue
-                  if v not in final_variants: final_variants.append(v)
-                  
-              # 安全閥啟動：如果過濾完不幸變空字串，強制輸出全大寫型號，確保絕對不漏放
-              if not final_variants:
-                  all_sticky_backup = re.sub(r"[-/ ]", "", core_model)
-                  if all_sticky_backup: final_variants.append(all_sticky_backup)
-                  
-              if final_variants:
-                  return f"# " + " / ".join(final_variants)
-              return ""
-          EOF
-          
-          echo "正在將智慧 Windows 修正邏輯重組寫入主要的 Python 原始碼中..."
-          python -c "
-          import re
-          with open('$FULL_FILENAME', 'r', encoding='utf-8') as f: code = f.read()
-          with open('patch_seo.py', 'r', encoding='utf-8') as f: patch = f.read()
-          
-          # 核心修正：強制將 Windows 專用的 \r\n 換行字元寫入 smart_merge_summary 函數中，徹底解決微軟 Excel 追加失效盲點
-          code = code.replace(r'final_body + \"\n\n\n\" + new_seo', r'final_body + \"\r\n\r\n\r\n\" + new_seo')
-          code = code.replace(r'final_body + \"\n\n\n\" + new_seo', r'final_body + \"\r\n\r\n\r\n\" + new_seo')
-          
-          code_mod = re.sub(r'def clean_and_generate_seo\(.*?\):.*?def smart_merge_summary_with_seo', patch + '\n\ndef smart_merge_summary_with_seo', code, flags=re.DOTALL)
-          with open('$FULL_FILENAME', 'w', encoding='utf-8') as f: f.write(code_mod)
-          "
-          
-          echo "🚀 正在打包 Windows 100% 成功相容並追加關鍵字的同名 EXE..."
-          pyinstaller --onefile --noconsole --name "$EXE_NAME" "$FULL_FILENAME"
-
-      - name: 6. 將同名 EXE 檔案直接提交至 Artifacts 下載區
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: "${{ env.EXE_NAME_RAW }}_Windows版_EXE"
-          path: dist/*.exe
-          retention-days: 90
-
-      - name: 7. 呼叫 GitHub 官方 CLI 進行智慧創建與強行覆蓋發佈
-        shell: bash
-        run: |
-          TAG="${{ github.event.inputs.version_tag }}"
-          FILE="${{ github.event.inputs.file_name }}"
-          
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --title "發佈版本 $TAG" --notes "此版本是由雲端自動化手動封包產出的 [ $FILE ] 執行檔。"
-          fi
-          
-          echo "正在啟動官方強行覆蓋機制上傳同名 EXE 檔案至 Release..."
-          gh release upload "$TAG" dist/*.exe --clobber
+    # 步驟 5：動態上傳封包好的成果
+    # 使用 PowerShell 自動偵測 dist 資料夾底下的 .exe 檔案並上傳，確保檔名一致
+    - name: 上傳成果物
+      uses: actions/upload-artifact@v4
+      with:
+        name: Packaged_Windows_EXE
+        path: dist/*.exe
