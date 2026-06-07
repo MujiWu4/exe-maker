@@ -1,46 +1,105 @@
-name: 自動打包為 Windows 獨立軟體
+name: 雲端自選檔案打包工具 (EXE)
 
-# 設定為手動觸發，並提供下拉選單與輸入框讓您選擇要封包的檔案
 on:
-  workflow_dispatch:
-    inputs:
-      target_file:
-        description: '請輸入或選擇您要封包的 Python 原始檔案名稱'
-        required: true
-        default: '關鍵字新增.py'  # 預設直接對準您的主程式
+workflow_dispatch: # 啟用 GitHub 網頁手動觸發功能
+inputs:
+file_name:
+description: '請輸入您要封包的 Python 原始碼檔名（需包含 .py 後綴）'
+required: true
+default: 'seo_universal_final_v2.py' # 預設顯示的主要檔案名稱
+type: string
+version_tag:
+description: '請設定本次發佈的版本號（例如: v1.0.0）'
+required: true
+default: 'v1.0.0'
+type: string
+
+permissions:
+contents: write # 賦予雲端電腦絕對的寫入與發佈權限
+
+env:
+# 強制所有雲端套件以穩定的 Node 24 引擎運行，確保 2026 年環境完美執行
+FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 綁定官方權限金鑰
 
 jobs:
-  build_windows_app:
-    runs-on: windows-latest  # 使用微軟 Windows 雲端環境進行封包
+build-and-release:
+runs-on: windows-2025
 
-    steps:
-    # 步驟 1：複製您 GitHub 倉庫內的所有程式碼
-    - name: 複製倉庫程式碼
-      uses: actions/checkout@v4
+steps:
+- name: 1. 複製 GitHub 原始碼到雲端
+uses: actions/checkout@v4.2.2
 
-    # 步驟 2：部署 Python 執行環境
-    - name: 安裝 Python 環境
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+- name: 2. 驗證檔案是否存在（防呆檢查）
+shell: bash
+run: |
+         if [ ! -f "${{ github.event.inputs.file_name }}" ]; then
+           echo "❌ 錯誤：在您的 GitHub 倉庫中找不到名為 [${{ github.event.inputs.file_name }}] 的檔案！"
+           echo "請確認檔案名稱大小寫是否正確、或是否已成功 Push 上傳。"
+           exit 1
+         fi
 
-    # 步驟 3：安裝專案必備的第三方套件與打包工具
-    # 根據您的程式碼，必須安裝 openpyxl 才能處理 Excel 檔案
-    - name: 安裝 PyInstaller 與 openpyxl 套件
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller openpyxl
+     - name: 3. 初始化雲端 Python 環境
+uses: actions/setup-python@v5.4.0
+with:
+python-version: '3.11'
 
-    # 步驟 4：執行 PyInstaller 編譯指令
-    # --onefile: 包裝成單一獨立的 .exe 執行檔
-    # --noconsole: 隱藏背後黑色的命令提示字元（CMD）視窗，讓它完全像一個正規的 Windows 視窗軟體
-    - name: 使用 PyInstaller 進行封包
-      run: |
-        pyinstaller --onefile --noconsole "${{ github.event.inputs.target_file }}"
+- name: 4. 安裝必要套件與封包工具
+run: |
+         python -m pip install --upgrade pip
+         pip install openpyxl pyinstaller
 
-    # 步驟 5：動態打包並輸出與原檔名完全一致的檔案
-    - name: 上傳打包好的 Windows 軟體
-      uses: actions/upload-artifact@v4
-      with:
-        name: Windows_Software_Package
-        path: dist/*.exe  # 自動抓取產出的同名 .exe 檔案
+      - name: 5. 啟動 Python 原生智慧切名並進行封包
+        shell: python
+      - name: 5. 啟動智慧原生環境變數進行「同名 EXE」封包
+        shell: bash
+run: |
+          import os
+          import subprocess
+          
+          # 1. 精準讀取網頁輸入的完整檔名
+          full_filename = "${{ github.event.inputs.file_name }}"
+          FULL_FILENAME="${{ github.event.inputs.file_name }}"
+         
+          # 2. 使用 Python 標準庫秒切副檔名，100% 避免 Windows 變數空白盲點
+          exe_name = os.path.splitext(full_filename)[0]
+          # 【終極核心修復】使用 Bash 記憶體內建切除語法，完美避開檔案寫入權限與 Windows 斜線盲點
+          # 此方法會精準咬住結尾的 .py 並抹除，不論中文（如：關鍵字新增）或英文，通通一秒切出純檔名
+          EXE_NAME="${FULL_FILENAME%.*}"
+         
+          # 3. 將純檔名寫入 GitHub 雲端環境變數中，供後續步驟讀取
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"EXE_NAME_RAW={exe_name}\n")
+              
+          print(f"🚀 正在將 [ {full_filename} ] 打包成同名執行檔 [ {exe_name}.exe ]...")
+          # 安全將變數傳遞給下一個步驟
+          echo "EXE_NAME_RAW=${EXE_NAME}" >> $GITHUB_ENV
+         
+          # 4. 執行打包命令
+          cmd = f"pyinstaller --onefile --noconsole --name \"{exe_name}\" \"{full_filename}\""
+          subprocess.run(cmd, shell=True, check=True)
+          echo "🚀 正在將 [ $FULL_FILENAME ] 打包成同名執行檔 [ ${EXE_NAME}.exe ]..."
+          pyinstaller --onefile --noconsole --name "$EXE_NAME" "$FULL_FILENAME"
+
+      # 修正點：有了上面 100% 穩定的純檔名變數，此處的 Artifacts 區塊將能完美還原您第一張截圖的直接下載畫面！
+      # 成果一：將在您的 Actions 任務 Summary 網頁最底部，完美呈現一鍵點擊直接下載的 Artifacts 區塊！
+- name: 6. 將同名 EXE 檔案直接提交至 Artifacts 下載區
+uses: actions/upload-artifact@v4.6.0
+with:
+name: "${{ env.EXE_NAME_RAW }}_Windows版_EXE"
+path: dist/*.exe
+retention-days: 90
+
+      # 成果二：將在您的 Releases 獨立頁面中，強行覆蓋殘留物，生成專屬於您指定名稱的同名 EXE 下載點！
+- name: 7. 呼叫 GitHub 官方 CLI 進行智慧創建與強行覆蓋發佈
+shell: bash
+run: |
+         TAG="${{ github.event.inputs.version_tag }}"
+         FILE="${{ github.event.inputs.file_name }}"
+         
+         if ! gh release view "$TAG" >/dev/null 2>&1; then
+           gh release create "$TAG" --title "發佈版本 $TAG" --notes "此版本是由雲端自動化手動封包產出的 [ $FILE ] 執行檔。"
+         fi
+         
+         echo "正在啟動官方強行覆蓋機制上傳同名 EXE 檔案至 Release..."
+         gh release upload "$TAG" dist/*.exe --clobber
