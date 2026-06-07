@@ -49,24 +49,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install openpyxl pyinstaller
 
-      - name: 5. 啟動 PyInstaller 進行「同名 EXE」智慧封包
-        shell: bash
+      - name: 5. 啟動 Python 原生智慧切名並進行封包
+        shell: python
         run: |
-          FULL_FILENAME="${{ github.event.inputs.file_name }}"
-          # 自動切除 .py 後綴，只留下純檔名 (例如: seo_universal_final_v2)
-          EXE_NAME=$(basename "$FULL_FILENAME" .py)
+          import os
+          import subprocess
           
-          echo "EXE_NAME_RAW=$EXE_NAME" >> $GITHUB_ENV
-          echo "正在將 [ $FULL_FILENAME ] 打包成同名執行檔 [ ${EXE_NAME}.exe ]..."
-          pyinstaller --onefile --noconsole --name "$EXE_NAME" "$FULL_FILENAME"
+          # 1. 精準讀取網頁輸入的完整檔名
+          full_filename = "${{ github.event.inputs.file_name }}"
+          
+          # 2. 使用 Python 標準庫秒切副檔名，100% 避免 Windows 變數空白盲點
+          exe_name = os.path.splitext(full_filename)[0]
+          
+          # 3. 將純檔名寫入 GitHub 雲端環境變數中，供後續步驟讀取
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"EXE_NAME_RAW={exe_name}\n")
+              
+          print(f"🚀 正在將 [ {full_filename} ] 打包成同名執行檔 [ {exe_name}.exe ]...")
+          
+          # 4. 執行打包命令
+          cmd = f"pyinstaller --onefile --noconsole --name \"{exe_name}\" \"{full_filename}\""
+          subprocess.run(cmd, shell=True, check=True)
 
-      # 【核心新增：完美還原您的截圖畫面】直接將同名 EXE 發佈到網頁下方的 Artifacts 直接下載區
+      # 修正點：有了上面 100% 穩定的純檔名變數，此處的 Artifacts 區塊將能完美還原您第一張截圖的直接下載畫面！
       - name: 6. 將同名 EXE 檔案直接提交至 Artifacts 下載區
-        uses: actions/upload-artifact@v4.3.3
+        uses: actions/upload-artifact@v4.6.0
         with:
-          name: "${{ env.EXE_NAME_RAW }}_Windows版_EXE" # 檔名與你指定的型號 100% 智慧同步
-          path: dist/*.exe # 自動抓取 dist 資料夾底下打包好的同名 exe 檔案
-          retention-days: 90 # 檔案在 GitHub 雲端下載區保留 90 天
+          name: "${{ env.EXE_NAME_RAW }}_Windows版_EXE"
+          path: dist/*.exe
+          retention-days: 90
 
       - name: 7. 呼叫 GitHub 官方 CLI 進行智慧創建與強行覆蓋發佈
         shell: bash
